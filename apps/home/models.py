@@ -19,3 +19,16 @@ from random import randint
 from django.template.defaultfilters import slugify
 #from moneyed import Money
 
+User =get_user_model()
+class File(models.Model):
+    name=models.CharField(max_length=100, unique=True)
+    size=models.IntegerField()
+    created_date=models.DateTimeField(auto_now_add=datetime.cow())
+    content_type=models.CharField(max_length=6)
+    upload_by=models.ForeignKey(User, on_delete= models.CASCADE)
+    s3_key=models.CharField(max_length=100)
+
+    
+    def __str__(self):
+        return self.name
+    
