@@ -3,31 +3,106 @@
 {%block content%}
 <div class="tab-content tab-content-basic">
     <div class="tab-pane fade show active" id="overview" role="tabpanel" aria-labelledby="overview"> 
-
-      <div class="tab-content tab-content-basic">
-        <div class="tab-pane fade show active" id="overview" role="tabpanel" aria-labelledby="overview"> 
-          <div class="row">
-            <div class="col-sm-12">
-              <div class="col-md grid-margin stretch-card">
-                <div class="card">
-                  <div class="card-body">
-                    <h4 class="card-title">Welcome</h4>
-                    <div class="media">
-                      <i class="ti-world icon-md text-info d-flex align-self-start me-3"></i>
-                      <div class="media-body">
-                        <p class="card-text">Our app is designed to handle all kinds of data cleaning tasks, from removing duplicates and fixing formatting issues to merging and merging data from multiple sources. And it's easy to use - simply upload your file and let our app do the rest.</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+     <div class="row">
+        <div class="col-sm-12">
+          <div class="statistics-details d-flex align-items-center justify-content-between">
+            <div>
+              <p class="statistics-title">Row X Column</p>
+              <h5 class="">{{rows}}X{{columns}}</h5>
+              {% comment %} <p class="text-danger d-flex"><i class="mdi mdi-menu-down"></i><span></span></p> {% endcomment %}
+            </div>
+            <div>
+              <p class="statistics-title">Total nulls</p>
+              <h5 class="rate-percentage">{{total_nulls|safe}}</h5>
+              {% comment %} <p class="text-success d-flex"><i class="mdi mdi-menu-up"></i><span></span></p> {% endcomment %}
+            </div>
+            <div>
+              <p class="statistics-title">% Null</p>
+              <h5 class="rate-percentage">{{null_percentage|escape}}%</h5>
+              {% comment %} <p class="text-danger d-flex"><i class="mdi mdi-menu-down"></i><span></span></p> {% endcomment %}
+            </div>
+            <div class="d-none d-md-block">
+              <p class="statistics-title">Data Set Size</p>
+              <h5 class="rate-percentage">{{size}}MB</h5>
+              {% comment %} <p class="text-success d-flex"><i class="mdi mdi-menu-down"></i><span></span></p> {% endcomment %}
+            </div>
+            <div class="d-none d-md-block">
+              <p class="statistics-title">Row Duplicates</p>
+              <h5 class="rate-percentage">{{duplicates}}</h5>
+              {% comment %} <p class="text-danger d-flex"><i class="mdi mdi-menu-down"></i><span></span></p> {% endcomment %}
+            </div>
+            <div class="d-none d-md-block">
+              <p class="statistics-title">Column with Highest Null</p>
+              <h5 class="rate-percentage">{{highest_name}}: {{highest_count}}</h5>
+              {% comment %} <p class="text-success d-flex"><i class="mdi mdi-menu-down"></i><span></span></p> {% endcomment %}
+            </div>
+          </div>
+        </div>
+      </div> 
+      <div class="col-md-6 col-lg-12 grid-margin stretch-card">
+        <div class="card card-rounded">
+          <div class="card-body">
+            <div class="row">
+              <h4>Data Preview</h4>
+            </div>
+            <div class=" card-body table-responsive">
+              <table class="table table-striped">
+                <thead>
+                    <tr>
+                        {% for column in preview %}
+                        <th>{{ column }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in preview.values %}
+                    <tr>
+                        {% for cell in row %}
+                        <td>{{ cell }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+              </table>
+            </div>
+              </div>
               </div>
             </div>
           </div>
         </div>
       </div>
+      <div class="col-md-6 col-lg-12 grid-margin stretch-card">
+        <div class="card card-rounded">
+          <div class="card-body">
+            <div class="row">
+              <form>
+                <div class="form-group">
+                  <label>Data cleaning tasks:</label>
+                  <form action="{% url 'cleaning_form' %}" method="post">
+                    {% csrf_token %}
+                    <ul>
+                      <li><input type="checkbox" name="duplicate_removal" value="1"> Removing duplicates</li>
+                      <li><input type="checkbox" name="missing_value_handling" value="1"> Handling missing values</li>
+                      <li><input type="checkbox" name="data_format_standardization" value="1"> Standardizing data formats</li>
+                      <li><input type="checkbox" name="data_normalization" value="1"> Normalizing data</li>
+                      <li><input type="checkbox" name="outlier_removal" value="1"> Removing outliers</li>
+                      <li><input type="checkbox" name="error_handling" value="1"> Handling errors</li>
+                      <li><input type="checkbox" name="merging_data" value="1"> Merging data from multiple sources</li>
+                      <li><input type="checkbox" name="categorical_data_handling" value="1"> Handling categorical data</li>
+                      <li><input type="checkbox" name="column_removal" value="1"> Removing unnecessary columns</li>
+                      <li><input type="checkbox" name="data_validation" value="1"> Validating data</li>
+                    </ul>
+                    <button type="submit">Submit</button>
+                  </form>
+                  
+                </div>
+              <button type="submit" class="btn btn-primary">Submit</button>
+            </form>
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
-
+ 
       {% comment %} <div class="row">
         <div class="col-lg-8 d-flex flex-column">
           <div class="row flex-grow">

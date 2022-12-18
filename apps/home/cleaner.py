@@ -1,4 +1,6 @@
 import pandas as pd
+
+from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import KNNImputer, IterativeImputer
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
@@ -13,6 +15,7 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 import numpy as np
 import inspect
+from typing import List, Dict, Optional, Tuple
 
 def split_column(df, column, delimiter, new_columns):
     """Split the values in the specified column of the DataFrame into multiple columns based on the specified delimiter."""
@@ -108,6 +111,9 @@ def stem_values(df, column):
     df[column] = df[column].apply(lambda x: " ".join([stemmer.stem(word) for word in x.split()]))
     return df
 
+def count_duplicate_rows(df: pd.DataFrame) -> int:
+    """Count the number of duplicate rows in a Pandas DataFrame."""
+    return df.duplicated().sum()
 
 def remove_duplicates(df):
     """Remove duplicate rows from the DataFrame and return the modified DataFrame."""
@@ -272,7 +278,15 @@ def clean_text_extra(df, column):
     df[column] = df[column].apply(lambda x: " ".join(x))
     return df
 
-
+def dataframe_size(df):
+    """Calculates the size of a pandas DataFrame in megabytes."""
+    # Calculate the memory usage of the DataFrame
+    memory_usage = df.memory_usage().sum()
+    
+    # Convert the memory usage to megabytes
+    size_in_mb = memory_usage / 1_000_000
+    
+    return round(size_in_mb,2)
 
 def calculate_dimensions(df):
     # calculate the number of rows and columns in the dataframe
@@ -302,7 +316,28 @@ def calculate_null_ratio_total(df):
 def calculate_null_percentage(df):
     # calculate the percentage of null values to non-null values in the dataframe
     null_percentage = 100 * df.isnull().sum().sum() / (df.shape[0] * df.shape[1])
-    return null_percentage
+    return round(null_percentage,1)
+
+def highest_null_column(df):
+    # Create a new dataframe containing boolean values indicating whether each value is null
+    null_df = df.isnull()
+
+    # Sum the number of null values in each column
+    null_counts = null_df.sum()
+
+    # Find the column with the highest sum of null values
+    highest_null_column = null_counts.idxmax()
+
+    # Get the count of null values in the highest null column
+    highest_null_count = null_counts[highest_null_column]
+
+    return highest_null_column, highest_null_count
+
+def find_column_with_most_nulls(df):
+    null_counts = df.isnull().sum()
+    most_nulls = null_counts.max()
+    most_null_column = null_counts[null_counts == most_nulls].index[0]
+    return most_null_column, most_nulls
 
 def remove_null_values_column(df, column):
     # remove null values from the specified column
@@ -515,7 +550,7 @@ def split_data(dataframe, column, values):
     return dataframe[dataframe[column].isin(values)]
 
 
-def combine_similar_data(data: List[pd.DataFrame]) -> pd.DataFrame:
+def combine_similar_data(data) -> pd.DataFrame:
     # Concatenate all dataframes into a single one
     df = pd.concat(data)
 
@@ -702,8 +737,3 @@ def clean_and_preprocess_data_extra(df):
     return df
 
 
-names = inspect.getmembers(sys.modules[__name__], inspect.isfunction)
-
-# Print the function names
-for name in names:
-    print(name[0])

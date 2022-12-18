@@ -8,8 +8,7 @@ from time import timezone
 from unicodedata import decimal
 from django.db import models
 from django.db.models import Sum, Q
-from datetime import date
-import datetime
+from datetime import datetime
 from django.urls import reverse
 import uuid
 from django.contrib.auth import get_user_model
@@ -23,11 +22,10 @@ User =get_user_model()
 class File(models.Model):
     name=models.CharField(max_length=100, unique=True)
     size=models.IntegerField()
-    created_date=models.DateTimeField(auto_now_add=datetime.cow())
+    created_date=models.DateTimeField(auto_now_add=datetime.now())
     content_type=models.CharField(max_length=6)
     upload_by=models.ForeignKey(User, on_delete= models.CASCADE)
-    s3_key=models.CharField(max_length=100)
-
+    file = models.FileField()
     
     def __str__(self):
         return self.name

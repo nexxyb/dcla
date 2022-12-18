@@ -7,6 +7,7 @@ Copyright (c) 2019 - present AppSeed.us
 from urllib import request
 from django import template, forms
 from django.http import HttpResponse, HttpResponseServerError , HttpResponseBadRequest
+from django.template.response import TemplateResponse
 from django.urls import reverse, reverse_lazy
 from django.views import generic
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -14,26 +15,24 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic.edit import CreateView, DeleteView, UpdateView
 from django.contrib.auth import get_user_model
 from django.shortcuts import redirect, render
-from .forms import ContactForm
 from django.core.mail import send_mail, BadHeaderError
 import boto3
-from datetime import timezone
+from datetime import timezone, datetime
 from django.dispatch import receiver
 from django.db.models.signals import post_save
 from django.conf import settings
 import pandas as pd
 from .models import File
-import tempfile
 from . import cleaner
-
+from django.core.files.storage import FileSystemStorage
 
 User=get_user_model()
 s3_client = boto3.resource('s3')
 
-class IndexView(generic.TemplateView):
+class IndexView(generic.TemplateView, LoginRequiredMixin ):
     template_name='home/raw2.html'
     
-class FileUploadView(generic.TemplateView):
+class FileUploadView(generic.TemplateView, LoginRequiredMixin ):
     
     def post(self, request):
         # Check if a file was uploaded
@@ -48,96 +47,117 @@ class FileUploadView(generic.TemplateView):
             # File is larger than 10 MB
             return HttpResponseBadRequest('File is too large')
         
-        if uploaded_file.content_type not in ['application/vnd.ms-excel', 'text/csv']:
+        if uploaded_file.content_type not in ['application/vnd.ms-excel', 'text/csv','text/tab-separated-values','application/json']:
             # File is not a valid image
             return HttpResponseBadRequest('Invalid file type')
         
         # Rename the file using the current timestamp
-        file_name = str(timezone.now().timestamp())
-        key = settings.AWS_FILE_UPLOAD_LOCATION + file_name
+        file_name = str(datetime.now().timestamp())
+        if settings.USE_S3:
+            
+        #key = settings.AWS_FILE_UPLOAD_LOCATION + file_name
         # Use the AWS SDK for Python (Boto3) to upload the file to the S3 bucket
-        try:
-            s3_client.meta.client.upload_file(uploaded_file, settings.AWS_STORAGE_BUCKET_NAME, key)
-        except Exception as e:
-            # Failed to upload the file to S3
-            return HttpResponseBadRequest('Failed to upload file to S3')
-        
-        # Save the uploaded file details to the database
-        file = File.objects.create(
-                                    name=file_name,
-                                    size=uploaded_file.size,
-                                    content_type=uploaded_file.content_type,
-                                    upload_by=request.user,
-                                    s3_key=key
+            #try:
+                #s3_client.meta.client.upload_file(uploaded_file, settings.AWS_STORAGE_BUCKET_NAME, key)
+            
+            # Save the uploaded file details to the database
+            upload = File(
+                            name=file_name,
+                            size=uploaded_file.size,
+                            content_type=uploaded_file.content_type,
+                            upload_by=self.request.user,
+                            file=uploaded_file
                                 )
+            upload.save()
+            # except Exception as e:
+            #     # Failed to upload the file to S3
+            #     return HttpResponseBadRequest('Failed to upload file')
         
-        return HttpResponse('File uploaded successfully')
+        else:
+            fs = FileSystemStorage()
+            filename = fs.save(uploaded_file.name, uploaded_file)
+        return redirect(reverse('file-fetch', kwargs={'pk': upload.id}))
 
-
-class FetchFileView(generic.TemplateView):
-    template_name='home/raw2.html'
+class FetchFileView(generic.DetailView, LoginRequiredMixin):
+    model= File
+    template_name='home/fetch.html'
     
-    def get(self, request,key):
-        # Connect to AWS S3
-        #s3 = boto3.client('s3')
+    def get(self,  request, *args, **kwargs):
+        # Call the parent class's get method to set the object attribute
+        response = super().get(request, *args, **kwargs)
 
-        # Get the file key from the request
-        #file_key = request.GET.get('file_key')
+        
+        # Access the query object
+        pk = kwargs['pk']
 
-        # Check if the file key was provided
-        if not key:
-            return HttpResponseBadRequest("Missing file key")
+        # Use the pk to retrieve the object from the database
+        obj = File.objects.get(pk=pk)
 
-        try:
-            # Download the file from S3
-            s3_client.meta.client.download_file(settings.AWS_STORAGE_BUCKET_NAME, key, '/tmp/temp_file.csv')
-        except Exception as e:
-            # Return a 500 error if the file cannot be downloaded
-            return HttpResponseServerError("Error downloading file: {}".format(e))
+        # Use get_context_data to create a context dictionary
+        context = self.get_context_data(object=obj, **kwargs)
 
+        datafile=obj.file
         # Load the file into a Pandas dataframe
-        df = pd.read_csv('/tmp/temp_file.csv')
+        df = pd.read_csv(datafile)
         
         # Store the data frame in the session
         request.session['data_frame'] = df.to_json()
 
         # Do some processing on the dataframe
-        context = {
-                'dimensions': cleaner.calculate_dimensions(df),
-                'total_nulls':cleaner.calculate_null_values_total(df),
-                'null_percentage':cleaner.calculate_null_percentage(df),
-                'preview':df.head(),
-        }
-        
+        #context['dimensions']= cleaner.calculate_dimensions(df),
+        dimensions= cleaner.calculate_dimensions(df)
+        context['rows']= dimensions[0]
+        context['columns']= dimensions[1]
+        context['total_nulls']=cleaner.calculate_null_values_total(df)
+        context['null_percentage']= cleaner.calculate_null_percentage(df)
+        context['preview']=df.head()
+        context['size']=cleaner.dataframe_size(df)
+        context['duplicates']=cleaner.count_duplicate_rows(df)
+        highest_null=cleaner.find_column_with_most_nulls(df)
+        context['highest_name']=highest_null[0]
+        context['highest_count']=highest_null[1]
         # Render the template
-        return render(request, self.template_name context=context)
-    
-    def  get_context_data(self, **kwargs):
-         # Call the base implementation first to get a context
-        context=super(FetchFileView , self).get_context_data(**kwargs)
-        # Add in a QuerySet of all other contexts
-        context['object']= 'Classroom'
-        return context
-    
-@receiver(post_save, sender=File)
-def filefetch_view(sender, instance, created, **kwargs):
-    if created:
-        filefetch_view = FetchFileView()
-        filefetch_view.get(request, key=instance.s3_key)   
+        return TemplateResponse(request, self.template_name, context)
+     
 class CleanView(generic.TemplateView):
-    template_name= "home/clean.html"
+    template_name= "home/fetch.html"
     
-    def get(self, request):
+    def post(self,  request, *args, **kwargs):
+        # Call the parent class's get method to set the object attribute
+        response = super().post(request, *args, **kwargs)
+        
         # Retrieve the data frame from the session
         df_json = request.session.get('data_frame')
-
+        
         # Deserialize the data frame from JSON
         df = pd.read_json(df_json)
         
-        # Do some processing on the data frame
-
-        # Render the template
-        return render(request, self.template_name)
+        selected_activities = []
+        if 'duplicate_removal' in request.POST:
+            selected_activities.append('duplicate_removal')
+        if 'missing_value_handling' in request.POST:
+            selected_activities.append('missing_value_handling')
+        # ...
+        
+        # Process the selected cleaning activities
+        # ...
+        request.session['data_frame2'] = df.to_json()
+        context = self.get_context_data(object=obj, **kwargs)
+        
+        dimensions= cleaner.calculate_dimensions(df)
+        context['rows']= dimensions[0]
+        context['columns']= dimensions[1]
+        context['total_nulls']=cleaner.calculate_null_values_total(df)
+        context['null_percentage']= cleaner.calculate_null_percentage(df)
+        context['preview']=df.head()
+        context['size']=cleaner.dataframe_size(df)
+        context['duplicates']=cleaner.count_duplicate_rows(df)
+        highest_null=cleaner.find_column_with_most_nulls(df)
+        context['highest_name']=highest_null[0]
+        context['highest_count']=highest_null[1]
+        
+        return TemplateResponse(request, self.template_name, context)
+    
 
 class DataQualityView(generic.TemplateView):
     template_name= 'home/data_quality.html'
