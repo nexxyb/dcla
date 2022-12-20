@@ -1,5 +1,4 @@
 import pandas as pd
-
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import KNNImputer, IterativeImputer
 from sklearn.cluster import KMeans
@@ -88,6 +87,18 @@ def remove_short_words(df, column, min_length):
     """Remove words that are shorter than the specified length from the specified column of the DataFrame."""
     df[column] = df[column].apply(lambda x: " ".join([word for word in x.split() if len(word) >= min_length]))
     return df
+
+def remove_short_chars(df, columns, min_length):
+    """Remove rows from the DataFrame that contain characters shorter than the specified length in all of the specified columns."""
+    df = df[df[columns].apply(lambda x: all(len(x[col]) >= min_length for col in columns), axis=1)]
+    return df
+
+
+def remove_long_chars(df, columns, max_length):
+    """Remove rows from the DataFrame that contain characters longer than the specified length in all of the specified columns."""
+    df = df[df[columns].apply(lambda x: all(len(x[col]) <= max_length for col in columns), axis=1)]
+    return df
+
 
 def remove_long_words(df, column, max_length):
     """Remove words that are longer than the specified length from the specified column of the DataFrame."""
@@ -201,7 +212,7 @@ def remove_duplicate_values(df, column):
 
 def remove_special_characters(df, column):
     """Remove special characters, such as punctuation marks and non-alphanumeric characters, from the values in the specified column of the DataFrame."""
-    df[column] = df[column].str.replace(r"[^a-zA-Z0-9]", " ")
+    df[column] = df[column].str.replace(r"[^a-zA-Z0-9]", "")
     return df
 
 def remove_stopwords(df, column, stopwords):
@@ -209,22 +220,49 @@ def remove_stopwords(df, column, stopwords):
     df[column] = df[column].apply(lambda x: " ".join([word for word in x.split() if word not in stopwords]))
     return df
 
-def clean_text(df, column, min_word_length, max_word_length):
+def clean_text(df, column, min_word_length=None, max_word_length=None):
     """Clean the text in the specified column of the DataFrame by removing numbers, white space, short words, special characters and long words."""
     # Remove numerical values from the column
     df = remove_numbers(df, column)
-
+    
+    # Remove punctuation
+    df[column] = df[column].str.replace(r"[^\w\s]", "")
+    # Convert to lowercase
+    df[column] = df[column].str.lower()
     # Remove extra white space, such as leading and trailing spaces, from the column
     df = remove_white_spaces(df, column)
 
-    # Remove words that are shorter than the specified length from the column
-    df = remove_short_words(df, column, min_word_length)
-
     df = remove_special_characters(df, column)
+    # Remove words that are shorter than the specified length from the column
+    df = remove_short_chars(df, column, min_word_length)
+
     # Remove words that are longer than the specified length from the column
-    df = remove_long_words(df, column, max_word_length)
+    df = remove_long_chars(df, column, max_word_length)
 
     return df
+
+def clean_text_columns(df, columns, min_word_length=None, max_word_length=None):
+    """Clean the text in the specified columns of the DataFrame by removing numbers, white space, short words, special characters and long words."""
+    for column in columns:
+        # Remove numerical values from the column
+        df = remove_numbers(df, column)
+        
+        # Remove punctuation
+        df[column] = df[column].str.replace(r"[^\w\s]", "")
+        # Convert to lowercase
+        df[column] = df[column].str.lower()
+        # Remove extra white space, such as leading and trailing spaces, from the column
+        df = remove_white_spaces(df, column)
+    
+        df = remove_special_characters(df, column)
+        # Remove words that are shorter than the specified length from the column
+        df = remove_short_chars(df, column, min_word_length)
+    
+        # Remove words that are longer than the specified length from the column
+        df = remove_long_chars(df, column, max_word_length)
+
+    return df
+
 
 def clean_and_normalize_text_column(df, column, min_word_length, stemming, lemmatization):
     """Clean and normalize the specified text column by removing numerical values, extra white space, short words, and performing stemming and/or lemmatization."""
@@ -737,3 +775,51 @@ def clean_and_preprocess_data_extra(df):
     return df
 
 
+def clean_numbers(df, columns):
+    """Clean the specified numerical columns of the DataFrame by replacing missing values, removing outliers, and normalizing the values."""
+    for column in columns:
+        # Replace missing values with the mean of the column
+        mean = df[column].mean()
+        df[column] = df[column].fillna(mean)
+        
+        # Remove outliers using the Tukey method
+        q1 = df[column].quantile(0.25)
+        q3 = df[column].quantile(0.75)
+        iqr = q3 - q1
+        lower_bound = q1 - (1.5 * iqr)
+        upper_bound = q3 + (1.5 * iqr)
+        df = df[(df[column] > lower_bound) & (df[column] < upper_bound)]
+        
+        # Normalize the values using min-max normalization
+        min_val = df[column].min()
+        max_val = df[column].max()
+        df[column] = (df[column] - min_val) / (max_val - min_val)
+
+    return df
+
+
+def clean_numeric_columns(df: pd.DataFrame, columns: List[str], decimal_places: Optional[int] = None) -> pd.DataFrame:
+    """Clean the specified numerical columns in the DataFrame by handling missing values, removing whitespace, special characters, and outliers, and normalizing and rounding values."""
+    # Replace missing values with the mean of the column
+    df[columns] = df[columns].fillna(df[columns].mean())
+    
+    # Remove whitespace and special characters from the columns
+    df[columns] = df[columns].apply(lambda x: x.str.strip().str.replace(r'[^\w\s]', ''))
+    
+    # Remove outliers using the Tukey method
+    for col in columns:
+        q1 = df[col].quantile(0.25)
+        q3 = df[col].quantile(0.75)
+        iqr = q3 - q1
+        lower_bound = q1 - (1.5 * iqr)
+        upper_bound = q3 + (1.5 * iqr)
+        df = df[(df[col] > lower_bound) & (df[col] < upper_bound)]
+    
+    # Normalize values using min-max normalization
+    df[columns] = (df[columns] - df[columns].min()) / (df[columns].max() - df[columns].min())
+    
+    # Round values to the specified number of decimal places
+    if decimal_places is not None:
+        df[columns] = df[columns].round(decimal_places)
+    
+    return df

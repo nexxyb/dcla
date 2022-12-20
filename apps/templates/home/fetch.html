@@ -1,6 +1,7 @@
 {%extends 'layouts/base.html' %}
 {%load static%}
 {%block content%}
+
 <div class="tab-content tab-content-basic">
     <div class="tab-pane fade show active" id="overview" role="tabpanel" aria-labelledby="overview"> 
      <div class="row">
@@ -75,33 +76,18 @@
         <div class="card card-rounded">
           <div class="card-body">
             <div class="row">
-              <form>
-                <div class="form-group">
+              {% comment %} <form> {% endcomment %}
+                <div class="form-group form-check">
                   <label>Data cleaning tasks:</label>
-                  <form action="{% url 'cleaning_form' %}" method="post">
+                  <form method="post"  action="{% url 'clean' %}">
                     {% csrf_token %}
-                    <ul>
-                      <li><input type="checkbox" name="duplicate_removal" value="1"> Removing duplicates</li>
-                      <li><input type="checkbox" name="missing_value_handling" value="1"> Handling missing values</li>
-                      <li><input type="checkbox" name="data_format_standardization" value="1"> Standardizing data formats</li>
-                      <li><input type="checkbox" name="data_normalization" value="1"> Normalizing data</li>
-                      <li><input type="checkbox" name="outlier_removal" value="1"> Removing outliers</li>
-                      <li><input type="checkbox" name="error_handling" value="1"> Handling errors</li>
-                      <li><input type="checkbox" name="merging_data" value="1"> Merging data from multiple sources</li>
-                      <li><input type="checkbox" name="categorical_data_handling" value="1"> Handling categorical data</li>
-                      <li><input type="checkbox" name="column_removal" value="1"> Removing unnecessary columns</li>
-                      <li><input type="checkbox" name="data_validation" value="1"> Validating data</li>
-                    </ul>
-                    <button type="submit">Submit</button>
-                  </form>
-                  
+                      
+                      <button type="submit" class="btn btn-primary">Submit</button>
+                    </form>  
                 </div>
-              <button type="submit" class="btn btn-primary">Submit</button>
-            </form>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-    </div>
  
       {% comment %} <div class="row">
         <div class="col-lg-8 d-flex flex-column">

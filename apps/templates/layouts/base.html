@@ -18,6 +18,14 @@
   <!-- Plugin css for this page -->
   <link rel="stylesheet" href="{% static 'vendors/datatables.net-bs4/dataTables.bootstrap4.css' %}">
   <link rel="stylesheet" href="{% static 'js/select.dataTables.min.css' %}">
+  <style>
+    .special {
+        display: none;
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
   <!-- End plugin css for this page -->
   <!-- inject:css -->
   <link rel="stylesheet" href="{% static 'css/vertical-layout-light/style.css' %}">
@@ -607,6 +615,29 @@
   <script src="{% static 'js/todolist.js' %}"></script>
   <!-- endinject -->
   <!-- Custom js for this page-->
+  <script>
+    function toggleField(checkbox) {
+      var field = document.getElementById(`${checkbox.value}-field`);
+      if (checkbox.checked) {
+        field.style.display = 'block';
+      } else {
+        field.style.display = 'none';
+      }
+    }
+    function toggleInnerField(checkbox) {
+      var field = document.getElementById(`${checkbox.value}-field`);
+      if (checkbox.checked) {
+        field.style.display = 'block';
+      } else {
+        field.style.display = 'none';
+      }
+    }
+    
+    
+    </script>
+    
+    
+
   <script src="{% static 'js/jquery.cookie.js'%}" type="text/javascript"></script>
   <script src="{% static 'js/dashboard.js' %}"></script>
   <script src="{% static 'js/Chart.roundedBarCharts.js' %}"></script>

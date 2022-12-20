@@ -25,7 +25,7 @@ import pandas as pd
 from .models import File
 from . import cleaner
 from django.core.files.storage import FileSystemStorage
-
+from .forms import DataCleaningForm
 User=get_user_model()
 s3_client = boto3.resource('s3')
 
@@ -102,7 +102,8 @@ class FetchFileView(generic.DetailView, LoginRequiredMixin):
         
         # Store the data frame in the session
         request.session['data_frame'] = df.to_json()
-
+        context['form']=DataCleaningForm()
+        context['class_attrs'] = {'class': 'special'}
         # Do some processing on the dataframe
         #context['dimensions']= cleaner.calculate_dimensions(df),
         dimensions= cleaner.calculate_dimensions(df)
@@ -119,7 +120,7 @@ class FetchFileView(generic.DetailView, LoginRequiredMixin):
         # Render the template
         return TemplateResponse(request, self.template_name, context)
      
-class CleanView(generic.TemplateView):
+class CleanView(generic.View):
     template_name= "home/fetch.html"
     
     def post(self,  request, *args, **kwargs):
@@ -132,17 +133,17 @@ class CleanView(generic.TemplateView):
         # Deserialize the data frame from JSON
         df = pd.read_json(df_json)
         
-        selected_activities = []
-        if 'duplicate_removal' in request.POST:
-            selected_activities.append('duplicate_removal')
-        if 'missing_value_handling' in request.POST:
-            selected_activities.append('missing_value_handling')
+        # selected_activities = []
+        # if 'duplicate_removal' in request.POST:
+        #     selected_activities.append('duplicate_removal')
+        # if 'missing_value_handling' in request.POST:
+        #     selected_activities.append('missing_value_handling')
         # ...
         
         # Process the selected cleaning activities
         # ...
         request.session['data_frame2'] = df.to_json()
-        context = self.get_context_data(object=obj, **kwargs)
+        context = self.get_context_data( **kwargs)
         
         dimensions= cleaner.calculate_dimensions(df)
         context['rows']= dimensions[0]
