@@ -134,6 +134,13 @@ def replace_missing_values(df, default_values):
     """Replace missing values in the DataFrame with default values and return the modified DataFrame."""
     return df.replace(pd.np.nan, default_values)
 
+def replace_null_values_pair(df, value_pairs_list):
+    for column_value_pairs in value_pairs_list:  
+        for column, value in column_value_pairs:
+            df[column] = df[column].fillna(value)
+    return df
+
+
 def convert_data_types(df, data_types):
     """Convert the data types of columns in the DataFrame and return the modified DataFrame."""
     return df.astype(data_types)
@@ -377,10 +384,12 @@ def find_column_with_most_nulls(df):
     most_null_column = null_counts[null_counts == most_nulls].index[0]
     return most_null_column, most_nulls
 
-def remove_null_values_column(df, column):
+def remove_null_values_column(df, columns):
     # remove null values from the specified column
-    df = df[pd.notnull(df[column])]
+    for column in columns:
+        df = df[pd.notnull(df[column])]
     return df
+
 
 def remove_null_values_row(dataframe, row_index):
     # Get the row at the specified index

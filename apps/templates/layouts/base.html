@@ -615,28 +615,7 @@
   <script src="{% static 'js/todolist.js' %}"></script>
   <!-- endinject -->
   <!-- Custom js for this page-->
-  <script>
-    function toggleField(checkbox) {
-      var field = document.getElementById(`${checkbox.value}-field`);
-      if (checkbox.checked) {
-        field.style.display = 'block';
-      } else {
-        field.style.display = 'none';
-      }
-    }
-    function toggleInnerField(checkbox) {
-      var field = document.getElementById(`${checkbox.value}-field`);
-      if (checkbox.checked) {
-        field.style.display = 'block';
-      } else {
-        field.style.display = 'none';
-      }
-    }
-    
-    
-    </script>
-    
-    
+  <script src="{% static 'js/mezil.js' %}"> </script>
 
   <script src="{% static 'js/jquery.cookie.js'%}" type="text/javascript"></script>
   <script src="{% static 'js/dashboard.js' %}"></script>

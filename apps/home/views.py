@@ -100,6 +100,9 @@ class FetchFileView(generic.DetailView, LoginRequiredMixin):
         # Load the file into a Pandas dataframe
         df = pd.read_csv(datafile)
         
+        # Get the column names
+        context['column_names'] = df.columns.to_list()
+      
         # Store the data frame in the session
         request.session['data_frame'] = df.to_json()
         context['form']=DataCleaningForm()
@@ -120,7 +123,7 @@ class FetchFileView(generic.DetailView, LoginRequiredMixin):
         # Render the template
         return TemplateResponse(request, self.template_name, context)
      
-class CleanView(generic.View):
+class CleanView(generic.FormView, LoginRequiredMixin):
     template_name= "home/fetch.html"
     
     def post(self,  request, *args, **kwargs):
@@ -132,16 +135,75 @@ class CleanView(generic.View):
         
         # Deserialize the data frame from JSON
         df = pd.read_json(df_json)
+        # Get the value of the "remove-duplicates" checkbox
+        remove_duplicates = request.POST.get('remove-duplicates')
+        if remove_duplicates:
+            df= cleaner.remove_duplicates(df)
+        # Get the value of the "remove-column" checkbox
+        remove_column = request.POST.get('remove-column')
+        # If the "remove-column" checkbox is checked, get the value of the "remove-column-input1" select element
+        if remove_column:
+            remove_column_names = request.POST.getlist('remove-column-input1') 
+            df= cleaner.remove_columns(df,columns=remove_column_names)
+
+        # Get the value of the "missing-values" checkbox
+        handle_missing_values = request.POST.get('missing-values')
+        # If the "missing-values-remove" checkbox is checked, get the value of the "missing-values-remove-input1" select element
+        if handle_missing_values:
+            missing_values_remove = request.POST.get('missing-values-remove')
+            if missing_values_remove:
+                missing_values_remove_columns = request.POST.getlist('missing-values-remove-input1') 
+                df= cleaner.remove_null_values_column(df, columns=missing_values_remove_columns)
+            
+            # If the "missing-values-replace" checkbox is checked, get the value of the "missing-values-replace-input1" select element and the "missing-values-replace-input2" text input
+            missing_values_replace = request.POST.get('missing-values-replace')
+            if missing_values_replace:
+                missing_values_replace_columns = request.POST.getlist('missing-values-replace-input1')
+                missing_values_replace_values = request.POST.getlist('missing-values-replace-input2') 
+                column_value_pairs=list(zip(missing_values_replace_columns, missing_values_replace_values))
+                df= cleaner.replace_null_values_pair(df, column_value_pairs)
+        convert_types= request.POST.get('convert-types')
+        if convert_types:
+            # The convert-types checkbox is checked
+            data_type_columns_and_types = []
+            for i in range(200):  # Loop through a large number of form elements
+                data_type_column = request.POST.get('dataTypeSelect1' + str(i+1))
+                if data_type_column:
+                    # The dataTypeSelect1 form element exists
+                    data_type = request.POST.get('dataTypeSelect2' + str(i+1))
+                    data_type_columns_and_types.append((data_type_column, data_type))
+                else:
+                    # No more form elements were found, exit the loop
+                    break
+
+            for data_type_column, data_type in data_type_columns_and_types:
+                if data_type == 'float':
+                    # Convert the column to float
+                    df[data_type_column] = pd.to_numeric(df[data_type_column], errors='coerce')
+                elif data_type == 'integer':
+                    # Convert the column to integer
+                    df[data_type_column] = pd.to_numeric(df[data_type_column], errors='coerce').astype(int)
+                elif data_type == 'boolean':
+                    # Convert the column to boolean
+                    df[data_type_column] = df[data_type_column].map({'True': True, 'False': False})
+                elif data_type == 'string':
+                    # Convert the column to string
+                    df[data_type_column] = df[data_type_column].astype(str)
+                elif data_type == 'datetime':
+                    # Convert the column to datetime
+                    df[data_type_column] = pd.to_datetime(df[data_type_column], errors='coerce')
+                elif data_type == 'timedelta[ns]':
+                    # Convert the column to timedelta[ns]
+                    df[data_type_column] = pd.to_timedelta(df[data_type_column], errors='coerce')
+                elif data_type == 'category':
+                    # Convert the column to category
+                    df[data_type_column] = df[data_type_column].astype('category')
+                elif data_type == 'complex':
+                    # Convert the column to complex
+                    df[data_type_column] = df[data_type_column].apply(complex)
+
         
-        # selected_activities = []
-        # if 'duplicate_removal' in request.POST:
-        #     selected_activities.append('duplicate_removal')
-        # if 'missing_value_handling' in request.POST:
-        #     selected_activities.append('missing_value_handling')
-        # ...
         
-        # Process the selected cleaning activities
-        # ...
         request.session['data_frame2'] = df.to_json()
         context = self.get_context_data( **kwargs)
         

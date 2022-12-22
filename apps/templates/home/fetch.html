@@ -76,14 +76,127 @@
         <div class="card card-rounded">
           <div class="card-body">
             <div class="row">
-              {% comment %} <form> {% endcomment %}
-                <div class="form-group form-check">
-                  <label>Data cleaning tasks:</label>
+                  <h4>Data cleaning tasks:</h4>
                   <form method="post"  action="{% url 'clean' %}">
                     {% csrf_token %}
-                      
-                      <button type="submit" class="btn btn-primary">Submit</button>
-                    </form>  
+                    <div class="form-group">
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" value="remove-duplicates" id="remove-duplicates" >
+                        <label class="form-check-label" for="remove-duplicates">
+                          Remove Duplicates
+                        </label>
+                      </div>
+                    </div>
+                    <div class="form-group">
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" value="remove-column" id="remove-column" onchange="toggleField(this)">
+                        <label class="form-check-label" for="remove-column">
+                          Remove Column(s)
+                        </label>
+                      </div>
+                      <fieldset id="remove-column-field" style="display:none;">
+                        <div class="form-group">
+                          <label for="remove-column-input1">Select Columns</label>
+                          <select class="form-control" id="remove-column-input1" multiple>
+                            <!-- Options for columns -->
+                            {% for column in column_names %}
+                                <option>{{ column }}</option>
+                            {% endfor %}
+                          </select>
+                        </div>
+                      </fieldset>
+                    </div>
+                    <div class="form-group">
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" value="missing-values" id="missing-values" onchange="toggleField(this)">
+                        <label class="form-check-label" for="missing-values">
+                          Handle Missing/Null Values
+                        </label>
+                      </div>
+                      <fieldset id="missing-values-field" style="display:none;">
+                        <div class="form-group">
+                          <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="missing-values-remove" id="missing-values-remove" onchange="toggleInnerField(this)">
+                            <label class="form-check-label" for="missing-values-remove">
+                              Remove rows with missing/null values on column.
+                            </label>
+                          </div>
+                        </div>
+                        <fieldset id="missing-values-remove-field" style="display:none;">
+                          <div class="form-group">
+                            <label for="missing-values-remove-input1">Select Columns</label>
+                            <select class="form-control" id="missing-values-remove-input1" multiple>
+                              <!-- Options for columns -->
+                              {% for column in column_names %}
+                                  <option>{{ column }}</option>
+                              {% endfor %}
+                            </select>
+                          </div>
+                        </fieldset>
+                        <div class="form-group">
+                          <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="missing-values-replace" id="missing-values-replace" onchange="toggleInnerField(this)">
+                            <label class="form-check-label" for="missing-values-replace">
+                              Replace with custom value on column.
+                            </label>
+                          </div>
+                        </div>
+                        <fieldset id="missing-values-replace-field" style="display:none;">
+                          <div class="form-group">
+                            <label for="missing-values-replace-input1">Select Column:</label>
+                            <select class="form-control" id="missing-values-replace-input1" multiple>
+                              <!-- Options for columns -->
+                              {% for column in column_names %}
+                                  <option>{{ column }}</option>
+                              {% endfor %}
+                            </select>
+                          </div>
+                          <div class="form-group">
+                            <label for="missing-values-replace-input2">Replace Value</label>
+                            <input type="text" class="form-control" id="missing-values-replace-input2" placeholder="Enter values separated by comma arranged as column names above">
+                          </div>
+                        </fieldset>
+                      </fieldset>
+                    </div>
+                    <div class="form-group">
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" value="convert-types" id="convert-types" onchange="toggleField(this)">
+                        <label class="form-check-label" for="convert-types">
+                          Convert Data Types
+                        </label>
+                      </div>
+                      <fieldset id="convert-types-field" style="display:none;">
+                        <div id="formRowContainer">
+                          <div class="form-row" id="formRowTemplate">
+                            <div class="col-6">
+                              <label for="dataTypeSelect1">Select Column</label>
+                              <select class="form-control" id="dataTypeSelect1">
+                                <!-- Options for data type 1 -->
+                                {% for column in column_names %}
+                                    <option>{{ column }}</option>
+                                {% endfor %}
+                              </select>
+                            </div>
+                            <div class="col-6">
+                              <label for="dataTypeSelect2">Select Data Type </label>
+                              <select class="form-control" id="dataTypeSelect2" onchange="addFormRow(this)">
+                                <!-- Options for data type 2 -->
+                                <option>float</option>
+                                <option>integer</option>
+                                <option>boolean</option>
+                                <option>string</option>
+                                <option>datetime</option>
+                                <option>timedelta[ns]</option>
+                                <option>category</option>
+                                <option>complex</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      </fieldset>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Submit</button>
+                  </form>  
                 </div>
               </div>
             </div>
