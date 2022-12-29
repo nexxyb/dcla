@@ -82,3 +82,52 @@ function toggleField(checkbox) {
     targetElement.removeChild(optionElement);
   }
   
+  function updateTaskProgress(options) {
+    // send an AJAX request to the Django view function to check the task progress
+    $.ajax({
+        url: '/task-progress/' + options.taskIdPrefix,
+        type: 'GET',
+        dataType: 'json',
+        success: function(response) {
+            var status = response.status;
+            var progress = response.progress;
+            // update the progress bar based on the task status and progress
+            if (status == 'SUCCESS') {
+                // task is complete, update the progress bar to 100%
+                document.getElementById(options.progressBarId).style.width = '100%';
+                document.getElementById(options.progressBarId + '-status').innerHTML = 'Task Completed';
+            } else if (status == 'FAILURE') {
+                // task has failed, stop checking the status and display an error message
+                clearInterval(options.intervalId);
+                document.getElementById(options.progressBarId + '-status').innerHTML = 'Task failed';
+            } else {
+                // task is still running, update the progress bar based on the task's progress
+                document.getElementById(options.progressBarId).style.width = progress + '%';
+                document.getElementById(options.progressBarId + '-status').innerHTML = 'Task in Progress';
+            }
+        }
+    });
+}
+ 
+function startTaskPolling(element) {
+    // get the progress bar ID from the element's ID
+    var progressBarId = element.id.replace('-container', '');
+
+    // check if the task ID is present in the session
+    var taskIdPrefix = progressBarId + '_id';
+    //  var taskId = '{{ request.session.[' + taskIdPrefix + '] }}';
+    // if (!taskId) {
+    //     // task ID is not present, hide the progress bar and return
+    //     element.style.display = 'none';
+    //     return;
+    // }
+
+    // start polling the task status every 1000 milliseconds (1 second)
+    var intervalId = setInterval(function() {
+        updateTaskProgress({
+            progressBarId: progressBarId,
+            taskIdPrefix: taskIdPrefix,
+            intervalId: intervalId,
+        });
+    }, 1000);
+}

@@ -19,4 +19,5 @@ urlpatterns = [
     path('integration', views.IntegrationView.as_view(), name='integration'),
     path('collaboration', views.CollaborationView.as_view(), name='collaboration'),
     path('support', views.SupportView.as_view(), name='support'),
+    path('task-progress/<str:task_id>', views.check_task_progress, name='task-progress')
 ]

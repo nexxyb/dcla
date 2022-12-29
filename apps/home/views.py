@@ -6,7 +6,7 @@ Copyright (c) 2019 - present AppSeed.us
 
 from urllib import request
 from django import template, forms
-from django.http import HttpResponse, HttpResponseServerError , HttpResponseBadRequest
+from django.http import HttpResponse, HttpResponseServerError , HttpResponseBadRequest, JsonResponse
 from django.template.response import TemplateResponse
 from django.urls import reverse, reverse_lazy
 from django.views import generic
@@ -26,6 +26,11 @@ from .models import File
 from . import cleaner
 from django.core.files.storage import FileSystemStorage
 from .forms import DataCleaningForm
+from .tasks import clean_data
+from celery.result import AsyncResult
+import redis
+
+
 User=get_user_model()
 s3_client = boto3.resource('s3')
 
@@ -123,13 +128,13 @@ class FetchFileView(generic.DetailView, LoginRequiredMixin):
         # Render the template
         return TemplateResponse(request, self.template_name, context)
      
-class CleanView(generic.FormView, LoginRequiredMixin):
+class CleanView(generic.View, LoginRequiredMixin):
     template_name= "home/fetch.html"
     
     def post(self,  request, *args, **kwargs):
         # Call the parent class's get method to set the object attribute
-        response = super().post(request, *args, **kwargs)
-        
+        #response = super().post(request, *args, **kwargs)
+        tasks=[]
         # Retrieve the data frame from the session
         df_json = request.session.get('data_frame')
         
@@ -138,13 +143,13 @@ class CleanView(generic.FormView, LoginRequiredMixin):
         # Get the value of the "remove-duplicates" checkbox
         remove_duplicates = request.POST.get('remove-duplicates')
         if remove_duplicates:
-            df= cleaner.remove_duplicates(df)
+            tasks.append(remove_duplicates.s())
         # Get the value of the "remove-column" checkbox
         remove_column = request.POST.get('remove-column')
         # If the "remove-column" checkbox is checked, get the value of the "remove-column-input1" select element
         if remove_column:
             remove_column_names = request.POST.getlist('remove-column-input1') 
-            df= cleaner.remove_columns(df,columns=remove_column_names)
+            tasks.append(remove_columns.s(columns=remove_column_names))
 
         # Get the value of the "missing-values" checkbox
         handle_missing_values = request.POST.get('missing-values')
@@ -153,7 +158,7 @@ class CleanView(generic.FormView, LoginRequiredMixin):
             missing_values_remove = request.POST.get('missing-values-remove')
             if missing_values_remove:
                 missing_values_remove_columns = request.POST.getlist('missing-values-remove-input1') 
-                df= cleaner.remove_null_values_column(df, columns=missing_values_remove_columns)
+                tasks.append(remove_null_on_column.s(columns=missing_values_remove_columns))
             
             # If the "missing-values-replace" checkbox is checked, get the value of the "missing-values-replace-input1" select element and the "missing-values-replace-input2" text input
             missing_values_replace = request.POST.get('missing-values-replace')
@@ -161,7 +166,7 @@ class CleanView(generic.FormView, LoginRequiredMixin):
                 missing_values_replace_columns = request.POST.getlist('missing-values-replace-input1')
                 missing_values_replace_values = request.POST.getlist('missing-values-replace-input2') 
                 column_value_pairs=list(zip(missing_values_replace_columns, missing_values_replace_values))
-                df= cleaner.replace_null_values_pair(df, column_value_pairs)
+                tasks.append(replace_null_on_columns.s( value_pairs_list=column_value_pairs))
         convert_types= request.POST.get('convert-types')
         if convert_types:
             # The convert-types checkbox is checked
@@ -176,37 +181,46 @@ class CleanView(generic.FormView, LoginRequiredMixin):
                     # No more form elements were found, exit the loop
                     break
 
-            for data_type_column, data_type in data_type_columns_and_types:
-                if data_type == 'float':
-                    # Convert the column to float
-                    df[data_type_column] = pd.to_numeric(df[data_type_column], errors='coerce')
-                elif data_type == 'integer':
-                    # Convert the column to integer
-                    df[data_type_column] = pd.to_numeric(df[data_type_column], errors='coerce').astype(int)
-                elif data_type == 'boolean':
-                    # Convert the column to boolean
-                    df[data_type_column] = df[data_type_column].map({'True': True, 'False': False})
-                elif data_type == 'string':
-                    # Convert the column to string
-                    df[data_type_column] = df[data_type_column].astype(str)
-                elif data_type == 'datetime':
-                    # Convert the column to datetime
-                    df[data_type_column] = pd.to_datetime(df[data_type_column], errors='coerce')
-                elif data_type == 'timedelta[ns]':
-                    # Convert the column to timedelta[ns]
-                    df[data_type_column] = pd.to_timedelta(df[data_type_column], errors='coerce')
-                elif data_type == 'category':
-                    # Convert the column to category
-                    df[data_type_column] = df[data_type_column].astype('category')
-                elif data_type == 'complex':
-                    # Convert the column to complex
-                    df[data_type_column] = df[data_type_column].apply(complex)
+            tasks.append(convert_data_type.s(data_type_columns_and_types))
+        
+        # Execute the clean_data_frame task asynchronously
+        result = clean_data.delay(df_json, tasks)
 
-        
-        
+        # Wait for the task to complete and get the result
+        df = result.get()
         request.session['data_frame2'] = df.to_json()
-        context = self.get_context_data( **kwargs)
+       
+        return TemplateResponse(request, 'home/task_progress.html')
+    
+
+
+def check_task_progress(request,taskIdPrefix ):
+    redis_client = redis.Redis(host='localhost', port=6379, db=0)
+
+    # Retrieve the task id from Redis cache
+    task_id = redis_client.get(f"{taskIdPrefix}")
+    task_id = task_id.decode()
+    # Check the status of the task
+    result = AsyncResult(task_id)
+    status = result.status
+    progress = result.info.get('progress', 0) if status == 'PROGRESS' else 100
+    return JsonResponse({'status': status, 'progress': progress})
+
+
+class AFterCleanView(generic.TemplateView):
+    template_name= 'home/after_clean.html'
+    
+    def get(self,  request, *args, **kwargs):
+        df_json = request.session.get('data_frame2')
         
+        # Deserialize the data frame from JSON
+        df = pd.read_json(df_json)
+        # Use get_context_data to create a context dictionary
+        context = self.get_context_data(**kwargs)
+
+        context['class_attrs'] = {'class': 'special'}
+        # Do some processing on the dataframe
+        #context['dimensions']= cleaner.calculate_dimensions(df),
         dimensions= cleaner.calculate_dimensions(df)
         context['rows']= dimensions[0]
         context['columns']= dimensions[1]
@@ -218,10 +232,9 @@ class CleanView(generic.FormView, LoginRequiredMixin):
         highest_null=cleaner.find_column_with_most_nulls(df)
         context['highest_name']=highest_null[0]
         context['highest_count']=highest_null[1]
-        
+        # Render the template
         return TemplateResponse(request, self.template_name, context)
     
-
 class DataQualityView(generic.TemplateView):
     template_name= 'home/data_quality.html'
     
